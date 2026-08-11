@@ -518,7 +518,7 @@
     </div>
     <div class="eyebrow">HT Upscale — AI image enlargement</div>
     <h1>Bigger, <em>and actually sharper.</em></h1>
-    <p class="sub">Enlarge photos up to 4× with an AI super-resolution model running entirely in your browser — new detail is reconstructed, not just stretched. Nothing is uploaded anywhere. Two models (Fast x4-v3, Quality x4plus) plus an AI-strength control: lower the strength for results that stay true to the original. Model and engine download once (~10 MB fast, ~38 MB quality) and are cached by the browser after that.</p>
+    <p class="sub">Enlarge photos with an AI super-resolution model running entirely in your browser — new detail is reconstructed, not just stretched. Nothing is uploaded anywhere. The AI-strength control blends the AI result with a plain high-quality upscale: slide it down for results that stay true to the original. Model and engine download once (~5 MB) and are cached by the browser after that.</p>
   </header>
 
   <div class="panel">
@@ -534,26 +534,19 @@
     <h2>02 — Set options</h2>
     <div class="grid">
       <div class="field">
-        <label>AI model</label>
-        <select id="model">
-          <option value="v3" selected>Fast — Real-ESRGAN x4-v3 (~5 MB)</option>
-          <option value="x4plus">Quality — Real-ESRGAN x4plus (~33 MB)</option>
-        </select>
-      </div>
-      <div class="field">
         <label>AI strength</label>
-        <input type="range" id="strength" min="0" max="100" step="5" value="100">
+        <input type="range" id="strength" min="0" max="100" step="5" value="50">
         <div class="range-row">
           <span>0% = plain crisp resize</span>
-          <b id="strengthVal">100%</b>
+          <b id="strengthVal">50%</b>
         </div>
       </div>
       <div class="field">
         <label>Upscale by</label>
         <select id="scale">
-          <option value="2">2×</option>
+          <option value="2" selected>2×</option>
           <option value="3">3×</option>
-          <option value="4" selected>4×</option>
+          <option value="4">4×</option>
         </select>
       </div>
       <div class="field">
@@ -565,7 +558,7 @@
         </select>
       </div>
     </div>
-    <p class="hint" id="modelHint">Fast (v3) runs about 5× quicker than Quality (x4plus). AI upscaling is tuned for photos — on screenshots and small text it can add fake strokes that look cartoonish. Slide AI strength down (25–50%) to keep the output true to the original; 0% gives a plain crisp resize. AI runs in a background worker, so the page stays responsive.</p>
+    <p class="hint" id="modelHint">AI upscaling is tuned for photos — on screenshots and small text it can add fake strokes that look cartoonish, so 50% is the default. Slide AI strength down (25–50%) to keep the output true to the original; 0% gives a plain crisp resize. AI runs in a background worker, so the page stays responsive.</p>
     <button class="convert-btn" id="convertBtn" disabled>Upscale</button>
     <div class="engine-status" id="engineStatus"><div class="spinner"></div><span id="engineStatusText">Loading AI engine…</span></div>
   </div>
@@ -580,7 +573,7 @@
   </div>
 
   <footer class="note">
-    HT Upscale runs the Real-ESRGAN super-resolution models (x4plus quality / x4-v3 fast) through onnxruntime in WebAssembly — the model and engine download once and are cached by the browser after that. The AI-strength control blends the AI result with a plain high-quality upscale, keeping output true to the original — ideal for screenshots and small text. Images are processed in 256×256 tiles so even large photos fit comfortably in memory; bigger images take longer (a 1024×1024 photo at 4× with Fast is roughly a minute on a typical laptop — Quality takes several times longer). Output is capped at 8192 px on the long side; anything larger would exceed browser canvas limits. Transparent PNGs are flattened onto a white background, since the model works in RGB. All processing happens locally in your browser; files are never sent anywhere.
+    HT Upscale runs the Real-ESRGAN x4-v3 super-resolution model through onnxruntime in WebAssembly — the model and engine download once and are cached by the browser after that. The AI-strength control blends the AI result with a plain high-quality upscale, keeping output true to the original — ideal for screenshots and small text. Images are processed in 256×256 tiles so even large photos fit comfortably in memory; bigger images take longer (a 1024×1024 photo at 4× with default strength is roughly a minute on a typical laptop). Output is capped at 8192 px on the long side; anything larger would exceed browser canvas limits. Transparent PNGs are flattened onto a white background, since the model works in RGB. All processing happens locally in your browser; files are never sent anywhere.
   </footer>
 </div>
 
@@ -607,15 +600,14 @@ const MODEL_SCALE = 4;
 const MAX_OUT_LONG = 8192;
 
 const MODELS = {
-  x4plus: { url: './vendor/models/realesrgan-x4plus.onnx', label: 'x4plus (~33 MB)' },
-  v3:     { url: './vendor/models/realesr-general-x4v3.onnx', label: 'x4-v3 (~5 MB)' }
+  v3: { url: './vendor/models/realesr-general-x4v3.onnx', label: 'x4-v3 (~5 MB)' }
 };
 
 let files = [];
 let outputs = [];
 let resultBadges = [];
 let loadedModels = {};
-let currentModel = 'x4plus';
+let currentModel = 'v3';
 let engineLoading = null;
 
 let worker = null;
@@ -980,7 +972,6 @@ convertBtn.addEventListener('click', async () => {
   const scale = parseInt(document.getElementById('scale').value);
   const mime = document.getElementById('format').value;
   const strength = parseInt(document.getElementById('strength').value);
-  currentModel = document.getElementById('model').value;
 
   try{
     await ensureEngine(currentModel);

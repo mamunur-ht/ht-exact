@@ -785,13 +785,20 @@ async function upscale4x(img, w, h, onTile){
   const tilesY = padH / TILE;
   const total = tilesX * tilesY;
   let done = 0;
-  const tileIn = new Float32Array(TILE * TILE * 3);
+  const TILE_LEN = TILE * TILE;
+  const tileIn = new Float32Array(TILE_LEN * 3);
 
   for(let ty = 0; ty < tilesY; ty++){
     for(let tx = 0; tx < tilesX; tx++){
       for(let y = 0; y < TILE; y++){
-        const src = ((ty * TILE + y) * padW + tx * TILE) * 3;
-        tileIn.set(inputFloat.subarray(src, src + TILE * 3), y * TILE * 3);
+        const base = (ty * TILE + y) * padW + tx * TILE;
+        const rowBase = y * TILE;
+        for(let x = 0; x < TILE; x++){
+          const pi = base + x;
+          tileIn[rowBase + x]          = inputFloat[pi];
+          tileIn[TILE_LEN + rowBase + x] = inputFloat[n + pi];
+          tileIn[2 * TILE_LEN + rowBase + x] = inputFloat[2 * n + pi];
+        }
       }
       const out = await runModelTile(tileIn);
       const T4 = TILE * MODEL_SCALE;

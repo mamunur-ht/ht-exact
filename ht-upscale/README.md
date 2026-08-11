@@ -4,7 +4,8 @@ Enlarge images 2×, 3×, or 4× with AI super-resolution — entirely in the
 browser. Nothing is uploaded anywhere.
 
 HT Upscale runs the [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
-`realesr-general-x4v3` model (BSD-3-Clause) through
+models — `realesrgan-x4plus` (quality, fp16, BSD-3-Clause) or
+`realesr-general-x4v3` (fast, BSD-3-Clause) — through
 [onnxruntime-web](https://onnxruntime.ai/) (WASM, single-threaded — no
 COOP/COEP headers needed, so it works on plain static hosts like Netlify
 drop or Vercel "Other"). It's the enlargement sibling of HT Exact and HT
@@ -12,8 +13,11 @@ Reel, kept as a fully separate tool.
 
 ## Features
 
-- 2× / 3× / 4× upscaling with the Real-ESRGAN x4-v3 model — new detail is
-  reconstructed, not just stretched
+- 2× / 3× / 4× upscaling with Real-ESRGAN — new detail is reconstructed,
+  not just stretched
+- Two models: **Quality (x4plus)** for faithful, natural results (good for
+  photos) and **Fast (x4-v3)** for quicker runs; each model is downloaded
+  once and cached
 - Batch multiple images, paste from clipboard (Ctrl+V)
 - PNG / JPG / WEBP output
 - Processed in 256×256 tiles so large images fit in memory; per-file
@@ -25,9 +29,9 @@ Reel, kept as a fully separate tool.
 
 ## Important limitations (be aware before shipping this)
 
-- **First upscale is slow to start**: the ONNX runtime + model (~16 MB
-  total) download and initialize the first time. Cached by the browser
-  after that.
+- **First upscale is slow to start**: the ONNX runtime + selected model
+  (x4plus ~33 MB, x4-v3 ~5 MB) download and initialize the first time.
+  Cached by the browser after that.
 - **CPU-bound and single-threaded WASM** (multi-threaded cores would need
   COOP/COEP headers, which default Netlify/Vercel don't set). Expect
   roughly 30–90 s per 1024×1024 image at 4× on a typical laptop; smaller
@@ -43,8 +47,10 @@ Reel, kept as a fully separate tool.
 - `favicon.ico`, `favicon-*.png` — shared HT brand favicon set
 - `vendor/ort/` — onnxruntime-web 1.20.1 self-hosted (loader + SIMD wasm
   core), not loaded from a CDN
+- `vendor/models/realesrgan-x4plus.onnx` — Real-ESRGAN x4plus model
+  (fp16, ~33 MB; input `[1,3,H,W]` fp16, output `[1,3,4H,4W]` fp16)
 - `vendor/models/realesr-general-x4v3.onnx` — Real-ESRGAN x4-v3 model
-  (SHA256 `09b757accd747d7e423c1d352b3e8f23e77cc5742d04bae958d4eb8082b76fa4`)
+  (fp32, ~5 MB; SHA256 `09b757accd747d7e423c1d352b3e8f23e77cc5742d04bae958d4eb8082b76fa4`)
 
 ## Run locally
 

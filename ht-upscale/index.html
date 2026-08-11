@@ -491,7 +491,7 @@
     </div>
     <div class="eyebrow">HT Upscale — AI image enlargement</div>
     <h1>Bigger, <em>and actually sharper.</em></h1>
-    <p class="sub">Enlarge photos up to 4× with an AI super-resolution model running entirely in your browser — new detail is reconstructed, not just stretched. Nothing is uploaded anywhere. First upscale downloads a small engine (~16 MB), so it takes a moment to start.</p>
+    <p class="sub">Enlarge photos up to 4× with an AI super-resolution model running entirely in your browser — new detail is reconstructed, not just stretched. Nothing is uploaded anywhere. Two models to choose from: Quality (x4plus) for faithful, natural results, or Fast (x4-v3) for quicker runs. The model and engine download once (~38 MB quality, ~10 MB fast) and are cached by the browser after that.</p>
   </header>
 
   <div class="panel">
@@ -506,6 +506,13 @@
   <div class="panel">
     <h2>02 — Set options</h2>
     <div class="grid">
+      <div class="field">
+        <label>AI model</label>
+        <select id="model">
+          <option value="x4plus" selected>Quality — Real-ESRGAN x4plus (~33 MB)</option>
+          <option value="v3">Fast — Real-ESRGAN x4-v3 (~5 MB)</option>
+        </select>
+      </div>
       <div class="field">
         <label>Upscale by</label>
         <select id="scale">
@@ -537,7 +544,7 @@
   </div>
 
   <footer class="note">
-    HT Upscale runs the Real-ESRGAN x4-v3 super-resolution model through onnxruntime in WebAssembly — the model and engine (~16 MB total) download once and are cached by the browser after that. Images are processed in 256×256 tiles so even large photos fit comfortably in memory; bigger images take longer (a 1024×1024 photo at 4× is roughly a minute on a typical laptop — try 2× for quicker results). Output is capped at 8192 px on the long side; anything larger would exceed browser canvas limits. Transparent PNGs are flattened onto a white background, since the model works in RGB. All processing happens locally in your browser; files are never sent anywhere.
+    HT Upscale runs the Real-ESRGAN super-resolution models (x4plus quality / x4-v3 fast) through onnxruntime in WebAssembly — the model and engine download once and are cached by the browser after that. Images are processed in 256×256 tiles so even large photos fit comfortably in memory; bigger images take longer (a 1024×1024 photo at 4× is roughly a minute on a typical laptop — try 2× for quicker results). Output is capped at 8192 px on the long side; anything larger would exceed browser canvas limits. Transparent PNGs are flattened onto a white background, since the model works in RGB. All processing happens locally in your browser; files are never sent anywhere.
   </footer>
 </div>
 
@@ -563,11 +570,17 @@ const TILE = 256;
 const MODEL_SCALE = 4;
 const MAX_OUT_LONG = 8192;
 
+const MODELS = {
+  x4plus: { url: './vendor/models/realesrgan-x4plus.onnx', label: 'x4plus (~33 MB)' },
+  v3:     { url: './vendor/models/realesr-general-x4v3.onnx', label: 'x4-v3 (~5 MB)' }
+};
+
 let files = [];
 let outputs = [];
 let resultBadges = [];
-let session = null;
-let engineLoading = false;
+let sessions = {};
+let currentModel = 'x4plus';
+let engineLoading = null;
 
 let toastTimer = null;
 function showToast(msg, type){
@@ -579,22 +592,49 @@ function showToast(msg, type){
   toastTimer = setTimeout(() => toast.classList.remove('show'), type === 'error' ? 5000 : 2600);
 }
 
-async function ensureEngine(){
-  if(session) return;
+function f32ToF16(v){
+  const f = new Float32Array(1); f[0] = v;
+  const u = new Uint32Array(f.buffer)[0];
+  const sign = (u >>> 16) & 0x8000;
+  let e = ((u >>> 23) & 0xff) - 127 + 15;
+  let m = u & 0x7fffff;
+  if(e <= 0){
+    if(e < -10) return sign;
+    m = (m | 0x800000) >>> (1 - e);
+    if(m & 0x1000) m += 0x2000;
+    return sign | (m >>> 13);
+  }
+  if(e >= 31) return sign | 0x7c00;
+  m += 0x1000;
+  if(m & 0x800000){ m >>>= 13; e++; if(e === 31) return sign | 0x7c00; }
+  else m >>>= 13;
+  return sign | (e << 10) | m;
+}
+
+function f16ToF32(h){
+  const s = (h & 0x8000) >>> 15, e = (h & 0x7c00) >>> 10, m = h & 0x3ff;
+  if(e === 0) return s ? -m * Math.pow(2, -24) : m * Math.pow(2, -24);
+  if(e === 31) return m ? NaN : (s ? -Infinity : Infinity);
+  const v = (m | 0x400) * Math.pow(2, e - 25);
+  return s ? -v : v;
+}
+
+async function ensureEngine(key){
+  if(sessions[key]) return;
   if(engineLoading){
     while(engineLoading) await new Promise(r => setTimeout(r, 200));
-    if(session) return;
+    if(sessions[key]) return;
   }
-  engineLoading = true;
+  engineLoading = key;
   engineStatus.classList.add('show');
-  engineStatusText.textContent = 'Loading AI engine (~16 MB, first time only)…';
+  engineStatusText.textContent = `Loading AI model — ${MODELS[key].label} (first time only, then cached)…`;
   try{
-    const res = await fetch('./vendor/models/realesr-general-x4v3.onnx');
+    const res = await fetch(MODELS[key].url);
     if(!res.ok) throw new Error('model download failed');
     const bytes = await res.arrayBuffer();
-    session = await ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] });
+    sessions[key] = await ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] });
   } finally {
-    engineLoading = false;
+    engineLoading = null;
     engineStatus.classList.remove('show');
   }
 }
@@ -749,8 +789,28 @@ function toFloatNCHW(id){
 }
 
 async function runModelTile(tileIn){
-  const tensor = new ort.Tensor('float32', tileIn, [1, 3, TILE, TILE]);
-  const result = await session.run({ input: tensor });
+  const key = currentModel;
+  const sess = sessions[key];
+  let tensor, result;
+  if(key === 'x4plus'){
+    const data = typeof Float16Array !== 'undefined'
+      ? Float16Array.from(tileIn)
+      : (() => { const d = new Uint16Array(tileIn.length); for(let i = 0; i < tileIn.length; i++) d[i] = f32ToF16(tileIn[i]); return d; })();
+    tensor = new ort.Tensor('float16', data, [1, 3, TILE, TILE]);
+    result = await sess.run({ input: tensor });
+    const raw = result.output.data;
+    const f32 = new Float32Array(raw.length);
+    if(raw instanceof Float32Array){
+      f32.set(raw);
+    } else if(typeof Float16Array !== 'undefined' && raw instanceof Float16Array){
+      for(let i = 0; i < f32.length; i++) f32[i] = raw[i];
+    } else {
+      for(let i = 0; i < f32.length; i++) f32[i] = f16ToF32(raw[i]);
+    }
+    return f32;
+  }
+  tensor = new ort.Tensor('float32', tileIn, [1, 3, TILE, TILE]);
+  result = await sess.run({ input: tensor });
   return result.output.data;
 }
 
@@ -864,9 +924,10 @@ convertBtn.addEventListener('click', async () => {
 
   const scale = parseInt(document.getElementById('scale').value);
   const mime = document.getElementById('format').value;
+  currentModel = document.getElementById('model').value;
 
   try{
-    await ensureEngine();
+    await ensureEngine(currentModel);
   } catch(e){
     console.error('HT Upscale: failed to load AI engine:', e);
     showToast(`Couldn't load the AI engine — ${e && e.message ? e.message : 'unknown error'}`, 'error');

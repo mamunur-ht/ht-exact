@@ -236,6 +236,25 @@
     border-color: var(--brass);
   }
   .field select{ font-family: var(--body); }
+  .field input[type=range]{
+    width: 100%;
+    accent-color: var(--brass);
+    background: transparent;
+    margin-top: 6px;
+  }
+  .field .range-row{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-top: 4px;
+    color: rgba(242,237,226,0.5);
+  }
+  .field .range-row b{
+    color: var(--brass);
+    font-weight: 400;
+  }
 
   .checkline{
     display:flex; align-items:center; gap:8px;
@@ -523,13 +542,11 @@
       </div>
       <div class="field">
         <label>AI strength</label>
-        <select id="strength">
-          <option value="100" selected>100% — Pure AI</option>
-          <option value="75">75% — Mostly AI</option>
-          <option value="50">50% — Balanced</option>
-          <option value="25">25% — Gentle (original-like)</option>
-          <option value="0">0% — No AI (plain resize)</option>
-        </select>
+        <input type="range" id="strength" min="0" max="100" step="5" value="100">
+        <div class="range-row">
+          <span>0% = plain crisp resize</span>
+          <b id="strengthVal">100%</b>
+        </div>
       </div>
       <div class="field">
         <label>Upscale by</label>
@@ -548,7 +565,7 @@
         </select>
       </div>
     </div>
-    <p class="hint" id="modelHint">Fast (v3) runs about 5× quicker than Quality (x4plus) — AI upscaling is tuned for photos, so screenshots and small text may gain halos; lower AI strength to keep the output close to the original. AI runs in a background worker, so the page stays responsive.</p>
+    <p class="hint" id="modelHint">Fast (v3) runs about 5× quicker than Quality (x4plus). AI upscaling is tuned for photos — on screenshots and small text it can add fake strokes that look cartoonish. Slide AI strength down (25–50%) to keep the output true to the original; 0% gives a plain crisp resize. AI runs in a background worker, so the page stays responsive.</p>
     <button class="convert-btn" id="convertBtn" disabled>Upscale</button>
     <div class="engine-status" id="engineStatus"><div class="spinner"></div><span id="engineStatusText">Loading AI engine…</span></div>
   </div>
@@ -672,6 +689,12 @@ dropzone.addEventListener('drop', e => {
   addFiles(e.dataTransfer.files);
 });
 fileInput.addEventListener('change', e => addFiles(e.target.files));
+
+const strengthInput = document.getElementById('strength');
+const strengthVal = document.getElementById('strengthVal');
+strengthInput.addEventListener('input', () => {
+  strengthVal.textContent = strengthInput.value + '%';
+});
 
 document.addEventListener('paste', e => {
   const items = e.clipboardData && e.clipboardData.items;
@@ -898,7 +921,19 @@ async function upscale4x(img, w, h, onTile, strength){
     const pctx = plain.getContext('2d');
     pctx.imageSmoothingEnabled = true;
     pctx.imageSmoothingQuality = 'high';
-    pctx.drawImage(img, 0, 0, w, h, 0, 0, fW, fH);
+    const midW = w * 2, midH = h * 2;
+    if(midW * midH <= 16777216){
+      const mid = document.createElement('canvas');
+      mid.width = midW;
+      mid.height = midH;
+      const mctx = mid.getContext('2d');
+      mctx.imageSmoothingEnabled = true;
+      mctx.imageSmoothingQuality = 'high';
+      mctx.drawImage(img, 0, 0, w, h, 0, 0, midW, midH);
+      pctx.drawImage(mid, 0, 0, midW, midH, 0, 0, fW, fH);
+    }else{
+      pctx.drawImage(img, 0, 0, w, h, 0, 0, fW, fH);
+    }
     const blend = document.createElement('canvas');
     blend.width = fW;
     blend.height = fH;

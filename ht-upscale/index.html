@@ -546,7 +546,7 @@
 <script type="module">
 import * as ort from './vendor/ort/ort.min.mjs';
 
-ort.env.wasm.wasmPaths = './vendor/ort/';
+ort.env.wasm.wasmPaths = new URL('vendor/ort/', document.baseURI).href;
 ort.env.wasm.numThreads = 1;
 
 const dropzone = document.getElementById('dropzone');

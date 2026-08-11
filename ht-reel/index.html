@@ -29,8 +29,8 @@
   .wrap{ max-width: 980px; margin: 0 auto; padding: 56px 24px 100px; }
   header{ margin-bottom: 48px; border-bottom: 1px solid rgba(242,237,226,0.14); padding-bottom: 32px; }
   .brand-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:10px; }
-  .brand-tag{ font-family: var(--body); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: rgba(242,237,226,0.4); text-decoration:none; }
-  .brand-tag:hover{ color: rgba(242,237,226,0.7); }
+  .brand-tag{ font-family: var(--body); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: rgba(242,237,226,0.4); text-decoration:none; border:1px solid rgba(242,237,226,0.18); padding:5px 10px; border-radius:5px; }
+  .brand-tag:hover{ color: var(--brass); border-color: rgba(193,147,47,0.4); }
   .tool-nav{ display:flex; gap:6px; font-family: var(--mono); font-size:11px; }
   .tool-nav a{ text-decoration:none; color: rgba(242,237,226,0.45); padding:5px 10px; border-radius:5px; border:1px solid transparent; }
   .tool-nav a:hover{ color: var(--paper); }
@@ -123,6 +123,7 @@
       <a class="brand-tag" href="../index.html">HT Exact</a>
       <nav class="tool-nav">
         <a href="../ht-image-compressor/index.html">Images</a>
+        <a href="../ht-upscale/index.html">Upscale</a>
         <a href="../ht-reel/index.html" class="active">Video</a>
       </nav>
     </div>

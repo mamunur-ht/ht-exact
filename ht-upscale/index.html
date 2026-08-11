@@ -757,6 +757,7 @@ async function runModelTile(tileIn){
 async function upscale4x(img, w, h, onTile){
   const padW = Math.ceil(w / TILE) * TILE;
   const padH = Math.ceil(h / TILE) * TILE;
+  const n = padW * padH;
   if(padW * padH > 16777216){
     throw new Error('input too large for the browser (max ~4096×4096 per image) — resize it first or use a lower scale');
   }
@@ -985,7 +986,7 @@ convertBtn.addEventListener('click', async () => {
       progLabel.textContent = 'Failed to process this file.';
       resultSizeEl.textContent = 'Failed';
       resultSizeEl.className = 'stat-value bad';
-      showToast(`Failed to upscale ${file.name}`, 'error');
+      showToast(`Failed to upscale ${file.name} — ${err && err.message ? err.message : 'unknown error'}`, 'error');
     }
   }
 

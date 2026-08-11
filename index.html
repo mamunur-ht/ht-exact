@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HT Exact — Hit an exact file size, every time</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#15140f;
+    --paper:#f2ede2;
+    --brass:#c1932f;
+    --brass-dim:#8a6a22;
+    --rust:#b2412a;
+    --mono: 'IBM Plex Mono', monospace;
+    --body: 'Inter', sans-serif;
+    --display: 'Fraunces', serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{ background: var(--ink); color: var(--paper); font-family: var(--body); min-height:100vh; }
+  .wrap{ max-width: 980px; margin: 0 auto; padding: 72px 24px 100px; }
+  .eyebrow{ font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); margin-bottom: 14px; }
+  h1{ font-family: var(--display); font-weight: 600; font-size: clamp(32px, 5vw, 52px); line-height: 1.05; margin: 0 0 14px; letter-spacing: -0.01em; }
+  h1 em{ font-style: italic; color: var(--brass); }
+  .sub{ font-size: 16px; line-height: 1.55; color: rgba(242,237,226,0.68); max-width: 600px; margin-bottom: 56px; }
+
+  .tools{ display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 22px; }
+  .tool-card{
+    display:block;
+    background: rgba(242,237,226,0.04);
+    border: 1px solid rgba(242,237,226,0.12);
+    border-radius: 12px;
+    padding: 32px;
+    text-decoration: none;
+    color: var(--paper);
+    transition: border-color .15s ease, background .15s ease, transform .15s ease;
+  }
+  .tool-card:hover{
+    border-color: var(--brass);
+    background: rgba(193,147,47,0.06);
+    transform: translateY(-2px);
+  }
+  .tool-kicker{
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(242,237,226,0.4);
+    margin-bottom: 10px;
+  }
+  .tool-name{
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .tool-desc{
+    font-size: 14px;
+    line-height: 1.55;
+    color: rgba(242,237,226,0.65);
+    margin-bottom: 20px;
+  }
+  .tool-cta{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--brass);
+    display:flex;
+    align-items:center;
+    gap: 6px;
+  }
+  .tool-card:hover .tool-cta{ gap: 10px; }
+  .tool-cta span{ transition: gap .15s ease; }
+
+  footer.note{ margin-top: 56px; font-size: 12px; color: rgba(242,237,226,0.35); line-height:1.6; }
+  ::selection{ background: var(--brass); color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">HT Exact</div>
+  <h1>Hit the number,<br><em>not just the ballpark.</em></h1>
+  <p class="sub">Tools that hit an exact target size — or make your files genuinely bigger and sharper — entirely in your browser, nothing uploaded anywhere. Pick the one you need.</p>
+
+  <div class="tools">
+    <a class="tool-card" href="./ht-image-compressor/index.html">
+      <div class="tool-kicker">Images</div>
+      <div class="tool-name">HT Image Compressor</div>
+      <div class="tool-desc">PNG, JPG, WEBP, and AVIF — set a target file size and dimensions, and HT Image Compressor searches for the exact quality setting that lands on target.</div>
+      <div class="tool-cta">Open HT Image Compressor <span>→</span></div>
+    </a>
+    <a class="tool-card" href="./ht-upscale/index.html">
+      <div class="tool-kicker">AI Upscaling</div>
+      <div class="tool-name">HT Upscale</div>
+      <div class="tool-desc">PNG, JPG, WEBP, and AVIF — enlarge images 2×, 3×, or 4× with a Real-ESRGAN super-resolution model that reconstructs real detail instead of just stretching pixels.</div>
+      <div class="tool-cta">Open HT Upscale <span>→</span></div>
+    </a>
+    <a class="tool-card" href="./ht-reel/index.html">
+      <div class="tool-kicker">Video</div>
+      <div class="tool-name">HT Reel</div>
+      <div class="tool-desc">MP4, MOV, WEBM, and MKV — set a target file size and HT Reel calculates the exact bitrate to land on it.</div>
+      <div class="tool-cta">Open HT Reel <span>→</span></div>
+    </a>
+  </div>
+
+  <footer class="note">
+    All tools run entirely client-side — files never leave your browser. HT Reel's first conversion loads a ~30 MB video engine, and HT Upscale's first run loads a ~16 MB AI model — both take a moment to start.
+  </footer>
+</div>
+</body>
+</html>

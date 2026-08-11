@@ -65,8 +65,8 @@ self.onmessage = async (e) => {
         tensor = new ort.Tensor('float32', msg.tileIn, [1, 3, TILE, TILE]);
         result = await sess.run({ input: tensor });
       }
-      const out = toFloat32(result.output.data).buffer;
-      self.postMessage({ id: msg.id, ok: true, out }, [out]);
+      const out = toFloat32(result.output.data);
+      self.postMessage({ id: msg.id, ok: true, out }, [out.buffer]);
     }
   } catch(err){
     self.postMessage({ id: msg.id, ok: false, error: String((err && err.message) || err) });

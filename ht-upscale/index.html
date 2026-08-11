@@ -499,7 +499,7 @@
     </div>
     <div class="eyebrow">HT Upscale — AI image enlargement</div>
     <h1>Bigger, <em>and actually sharper.</em></h1>
-    <p class="sub">Enlarge photos up to 4× with an AI super-resolution model running entirely in your browser — new detail is reconstructed, not just stretched. Nothing is uploaded anywhere. Two models to choose from: Quality (x4plus) for faithful, natural results, or Fast (x4-v3) for quicker runs. The model and engine download once (~38 MB quality, ~10 MB fast) and are cached by the browser after that.</p>
+    <p class="sub">Enlarge photos up to 4× with an AI super-resolution model running entirely in your browser — new detail is reconstructed, not just stretched. Nothing is uploaded anywhere. Two models (Fast x4-v3, Quality x4plus) plus an AI-strength control: lower the strength for results that stay true to the original. Model and engine download once (~10 MB fast, ~38 MB quality) and are cached by the browser after that.</p>
   </header>
 
   <div class="panel">
@@ -517,8 +517,18 @@
       <div class="field">
         <label>AI model</label>
         <select id="model">
-          <option value="x4plus" selected>Quality — Real-ESRGAN x4plus (~33 MB)</option>
-          <option value="v3">Fast — Real-ESRGAN x4-v3 (~5 MB)</option>
+          <option value="v3" selected>Fast — Real-ESRGAN x4-v3 (~5 MB)</option>
+          <option value="x4plus">Quality — Real-ESRGAN x4plus (~33 MB)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>AI strength</label>
+        <select id="strength">
+          <option value="100" selected>100% — Pure AI</option>
+          <option value="75">75% — Mostly AI</option>
+          <option value="50">50% — Balanced</option>
+          <option value="25">25% — Gentle (original-like)</option>
+          <option value="0">0% — No AI (plain resize)</option>
         </select>
       </div>
       <div class="field">
@@ -538,7 +548,7 @@
         </select>
       </div>
     </div>
-    <p class="hint" id="modelHint">Quality (x4plus) is heavy on CPU and can take several minutes per large photo — switch to Fast (x4-v3) for much quicker runs. AI runs in a background worker, so the page stays responsive.</p>
+    <p class="hint" id="modelHint">Fast (v3) runs about 5× quicker than Quality (x4plus) — AI upscaling is tuned for photos, so screenshots and small text may gain halos; lower AI strength to keep the output close to the original. AI runs in a background worker, so the page stays responsive.</p>
     <button class="convert-btn" id="convertBtn" disabled>Upscale</button>
     <div class="engine-status" id="engineStatus"><div class="spinner"></div><span id="engineStatusText">Loading AI engine…</span></div>
   </div>
@@ -553,7 +563,7 @@
   </div>
 
   <footer class="note">
-    HT Upscale runs the Real-ESRGAN super-resolution models (x4plus quality / x4-v3 fast) through onnxruntime in WebAssembly — the model and engine download once and are cached by the browser after that. Images are processed in 256×256 tiles so even large photos fit comfortably in memory; bigger images take longer (a 1024×1024 photo at 4× is roughly a minute on a typical laptop — try 2× for quicker results). Output is capped at 8192 px on the long side; anything larger would exceed browser canvas limits. Transparent PNGs are flattened onto a white background, since the model works in RGB. All processing happens locally in your browser; files are never sent anywhere.
+    HT Upscale runs the Real-ESRGAN super-resolution models (x4plus quality / x4-v3 fast) through onnxruntime in WebAssembly — the model and engine download once and are cached by the browser after that. The AI-strength control blends the AI result with a plain high-quality upscale, keeping output true to the original — ideal for screenshots and small text. Images are processed in 256×256 tiles so even large photos fit comfortably in memory; bigger images take longer (a 1024×1024 photo at 4× with Fast is roughly a minute on a typical laptop — Quality takes several times longer). Output is capped at 8192 px on the long side; anything larger would exceed browser canvas limits. Transparent PNGs are flattened onto a white background, since the model works in RGB. All processing happens locally in your browser; files are never sent anywhere.
   </footer>
 </div>
 
@@ -807,7 +817,7 @@ async function runModelTile(tileIn){
   return res.out;
 }
 
-async function upscale4x(img, w, h, onTile){
+async function upscale4x(img, w, h, onTile, strength){
   const padW = Math.ceil(w / TILE) * TILE;
   const padH = Math.ceil(h / TILE) * TILE;
   const n = padW * padH;
@@ -881,7 +891,24 @@ async function upscale4x(img, w, h, onTile){
       await new Promise(r => setTimeout(r, 0));
     }
   }
-  return { canvas: outCanvas, capped: cap < 1 };
+  if(strength < 100 && cap >= 1){
+    const plain = document.createElement('canvas');
+    plain.width = fW;
+    plain.height = fH;
+    const pctx = plain.getContext('2d');
+    pctx.imageSmoothingEnabled = true;
+    pctx.imageSmoothingQuality = 'high';
+    pctx.drawImage(img, 0, 0, w, h, 0, 0, fW, fH);
+    const blend = document.createElement('canvas');
+    blend.width = fW;
+    blend.height = fH;
+    const bctx = blend.getContext('2d');
+    bctx.drawImage(plain, 0, 0);
+    bctx.globalAlpha = strength / 100;
+    bctx.drawImage(outCanvas, 0, 0);
+    return { canvas: blend, capped: cap < 1, blended: true };
+  }
+  return { canvas: outCanvas, capped: cap < 1, blended: false };
 }
 
 function resizeTo(canvas, w, h){
@@ -917,6 +944,7 @@ convertBtn.addEventListener('click', async () => {
 
   const scale = parseInt(document.getElementById('scale').value);
   const mime = document.getElementById('format').value;
+  const strength = parseInt(document.getElementById('strength').value);
   currentModel = document.getElementById('model').value;
 
   try{
@@ -1000,7 +1028,7 @@ convertBtn.addEventListener('click', async () => {
       origDimsEl.textContent = `${w}×${h}`;
       progLabel.textContent = 'AI upscaling… 0%';
 
-      const { canvas, capped } = await upscale4x(img, w, h, onTile);
+      const { canvas, capped, blended } = await upscale4x(img, w, h, onTile, strength);
       let outCanvas = canvas;
       if(scale < MODEL_SCALE){
         outCanvas = resizeTo(canvas, Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
@@ -1018,6 +1046,10 @@ convertBtn.addEventListener('click', async () => {
       if(capped){
         noticeEl.style.display = 'block';
         noticeEl.textContent = 'Output capped at 8192 px on the long side (browser canvas limit). You can drop the input resolution for the full 4×.';
+      } else if(blended){
+        noticeEl.style.display = 'block';
+        noticeEl.style.opacity = '0.6';
+        noticeEl.textContent = `AI strength ${strength}% — blended with a plain upscale to stay close to the original.`;
       }
 
       const url = URL.createObjectURL(blob);

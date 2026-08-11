@@ -15,9 +15,13 @@ Reel, kept as a fully separate tool.
 
 - 2× / 3× / 4× upscaling with Real-ESRGAN — new detail is reconstructed,
   not just stretched
-- Two models: **Quality (x4plus)** for faithful, natural results (good for
-  photos) and **Fast (x4-v3)** for quicker runs; each model is downloaded
-  once and cached
+- Two models: **Fast (x4-v3, ~5 MB)** for quick runs and **Quality
+  (x4plus, ~33 MB)** for natural, faithful results; each model is
+  downloaded once and cached
+- **AI strength** control (0–100%): blends the AI result with a plain
+  high-quality upscale, so output can stay close to the original —
+  ideal for screenshots, small text, and UI captures where GAN
+  sharpening looks artificial
 - Batch multiple images, paste from clipboard (Ctrl+V)
 - PNG / JPG / WEBP output
 - Processed in 256×256 tiles so large images fit in memory; per-file
@@ -41,8 +45,9 @@ Reel, kept as a fully separate tool.
   images and 2× are much faster. WebGPU acceleration is possible later
   via `executionProviders: ['webgpu']` + the `jsep` wasm files if you
   ever add the headers.
-- Very large inputs can take several minutes and a lot of RAM — best on
-  desktop.
+- **AI models are photo-tuned**: on screenshots, UI text and sharp
+  graphics may gain halos / an artificial "AI" look. Lower the AI
+  strength or use a smaller scale for text-heavy images.
 
 ## Files
 

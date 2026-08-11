@@ -22,6 +22,9 @@ Reel, kept as a fully separate tool.
 - PNG / JPG / WEBP output
 - Processed in 256×256 tiles so large images fit in memory; per-file
   progress (tile counter), before/after preview, time taken
+- AI runs in a **Web Worker**, so the page never freezes during upscaling
+  (the model itself still uses the CPU heavily — expect the Quality
+  x4plus model to be slow on large photos)
 - Download individually or all results as a `.zip`
 - Output capped at 8192 px on the long side (browser canvas limit) —
   noted in the UI when it applies
@@ -44,6 +47,8 @@ Reel, kept as a fully separate tool.
 ## Files
 
 - `index.html` — the app
+- `worker.js` — Web Worker that runs all model inference off the main
+  thread (so the UI stays responsive while upscaling)
 - `favicon.ico`, `favicon-*.png` — shared HT brand favicon set
 - `vendor/ort/` — onnxruntime-web 1.20.1 self-hosted (loader + SIMD wasm
   core), not loaded from a CDN

@@ -105,6 +105,14 @@
     color: rgba(242,237,226,0.68);
     max-width: 600px;
   }
+  .hint{
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(242,237,226,0.45);
+    max-width: 560px;
+    margin: 14px 0 18px;
+  }
   .panel{
     background: rgba(242,237,226,0.04);
     border: 1px solid rgba(242,237,226,0.12);
@@ -530,6 +538,7 @@
         </select>
       </div>
     </div>
+    <p class="hint" id="modelHint">Quality (x4plus) is heavy on CPU and can take several minutes per large photo — switch to Fast (x4-v3) for much quicker runs. AI runs in a background worker, so the page stays responsive.</p>
     <button class="convert-btn" id="convertBtn" disabled>Upscale</button>
     <div class="engine-status" id="engineStatus"><div class="spinner"></div><span id="engineStatusText">Loading AI engine…</span></div>
   </div>
@@ -578,9 +587,40 @@ const MODELS = {
 let files = [];
 let outputs = [];
 let resultBadges = [];
-let sessions = {};
+let loadedModels = {};
 let currentModel = 'x4plus';
 let engineLoading = null;
+
+let worker = null;
+let msgId = 0;
+const pending = new Map();
+
+function getWorker(){
+  if(!worker){
+    worker = new Worker('./worker.js', { type: 'module' });
+    worker.onmessage = e => {
+      const p = pending.get(e.data.id);
+      if(!p) return;
+      pending.delete(e.data.id);
+      if(e.data.ok) p.resolve(e.data);
+      else p.reject(new Error(e.data.error));
+    };
+    worker.onerror = e => {
+      for(const p of pending.values()) p.reject(new Error('worker error: ' + (e.message || 'unknown')));
+      pending.clear();
+      worker = null;
+    };
+  }
+  return worker;
+}
+
+function postToWorker(msg){
+  return new Promise((resolve, reject) => {
+    const id = ++msgId;
+    pending.set(id, { resolve, reject });
+    getWorker().postMessage({ ...msg, id });
+  });
+}
 
 let toastTimer = null;
 function showToast(msg, type){
@@ -592,38 +632,11 @@ function showToast(msg, type){
   toastTimer = setTimeout(() => toast.classList.remove('show'), type === 'error' ? 5000 : 2600);
 }
 
-function f32ToF16(v){
-  const f = new Float32Array(1); f[0] = v;
-  const u = new Uint32Array(f.buffer)[0];
-  const sign = (u >>> 16) & 0x8000;
-  let e = ((u >>> 23) & 0xff) - 127 + 15;
-  let m = u & 0x7fffff;
-  if(e <= 0){
-    if(e < -10) return sign;
-    m = (m | 0x800000) >>> (1 - e);
-    if(m & 0x1000) m += 0x2000;
-    return sign | (m >>> 13);
-  }
-  if(e >= 31) return sign | 0x7c00;
-  m += 0x1000;
-  if(m & 0x800000){ m >>>= 13; e++; if(e === 31) return sign | 0x7c00; }
-  else m >>>= 13;
-  return sign | (e << 10) | m;
-}
-
-function f16ToF32(h){
-  const s = (h & 0x8000) >>> 15, e = (h & 0x7c00) >>> 10, m = h & 0x3ff;
-  if(e === 0) return s ? -m * Math.pow(2, -24) : m * Math.pow(2, -24);
-  if(e === 31) return m ? NaN : (s ? -Infinity : Infinity);
-  const v = (m | 0x400) * Math.pow(2, e - 25);
-  return s ? -v : v;
-}
-
 async function ensureEngine(key){
-  if(sessions[key]) return;
+  if(loadedModels[key]) return;
   if(engineLoading){
     while(engineLoading) await new Promise(r => setTimeout(r, 200));
-    if(sessions[key]) return;
+    if(loadedModels[key]) return;
   }
   engineLoading = key;
   engineStatus.classList.add('show');
@@ -632,7 +645,8 @@ async function ensureEngine(key){
     const res = await fetch(MODELS[key].url);
     if(!res.ok) throw new Error('model download failed');
     const bytes = await res.arrayBuffer();
-    sessions[key] = await ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] });
+    await postToWorker({ type: 'load', key, buffer: bytes });
+    loadedModels[key] = true;
   } finally {
     engineLoading = null;
     engineStatus.classList.remove('show');
@@ -789,29 +803,8 @@ function toFloatNCHW(id){
 }
 
 async function runModelTile(tileIn){
-  const key = currentModel;
-  const sess = sessions[key];
-  let tensor, result;
-  if(key === 'x4plus'){
-    const data = typeof Float16Array !== 'undefined'
-      ? Float16Array.from(tileIn)
-      : (() => { const d = new Uint16Array(tileIn.length); for(let i = 0; i < tileIn.length; i++) d[i] = f32ToF16(tileIn[i]); return d; })();
-    tensor = new ort.Tensor('float16', data, [1, 3, TILE, TILE]);
-    result = await sess.run({ input: tensor });
-    const raw = result.output.data;
-    const f32 = new Float32Array(raw.length);
-    if(raw instanceof Float32Array){
-      f32.set(raw);
-    } else if(typeof Float16Array !== 'undefined' && raw instanceof Float16Array){
-      for(let i = 0; i < f32.length; i++) f32[i] = raw[i];
-    } else {
-      for(let i = 0; i < f32.length; i++) f32[i] = f16ToF32(raw[i]);
-    }
-    return f32;
-  }
-  tensor = new ort.Tensor('float32', tileIn, [1, 3, TILE, TILE]);
-  result = await sess.run({ input: tensor });
-  return result.output.data;
+  const res = await postToWorker({ type: 'run', key: currentModel, tileIn });
+  return res.out;
 }
 
 async function upscale4x(img, w, h, onTile){
